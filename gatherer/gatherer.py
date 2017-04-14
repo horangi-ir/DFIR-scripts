@@ -13,9 +13,11 @@ import re
 import psutil
 import admin
 from socket import gethostname
+import ntpath
 from collectors import *
 
 argparser = argparse.ArgumentParser(description='Hash files recursively from all NTFS parititions in a live system and optionally extract them')
+
 argparser.add_argument(
         '-i', '--image',
         dest='imagefile',
@@ -25,15 +27,17 @@ argparser.add_argument(
         required=False,
         help='E01 to extract from'
     )
-argparser.add_argument(
-        '-p', '--path',
-        dest='path',
-        action="store",
-        type=str,
-        default='/',
-        required=False,
-        help='Path to recurse from, defaults to /'
-    )
+
+# argparser.add_argument(
+#         '-p', '--path',
+#         dest='path',
+#         action="store",
+#         type=str,
+#         default='/',
+#         required=False,
+#         help='Path to recurse from, defaults to /'
+#     )
+
 argparser.add_argument(
         '-o', '--output',
         dest='output',
@@ -43,32 +47,34 @@ argparser.add_argument(
         required=True,
         help='File to write the hashes to'
     )
-argparser.add_argument(
-        '-s', '--search',
-        dest='search',
-        action="store",
-        type=str,
-        default='.*',
-        required=False,
-        help='Specify search parameter e.g. *.lnk'
-    )
-argparser.add_argument(
-        '-e', '--extract',
-        dest='extract',
-        action="store_true",
-        default=False,
-        required=False,
-        help='Pass this option to extract files found'
-    )
 
-argparser.add_argument(
-        '-l', '--live',
-        dest='live',
-        action="store_true",
-        default=False,
-        required=False,
-        help='determines if this is live or dead acquisition'
-    )
+# argparser.add_argument(
+#         '-s', '--search',
+#         dest='search',
+#         action="store",
+#         type=str,
+#         default='.*',
+#         required=False,
+#         help='Specify search parameter e.g. *.lnk'
+#     )
+
+# argparser.add_argument(
+#         '-e', '--extract',
+#         dest='extract',
+#         action="store_true",
+#         default=False,
+#         required=False,
+#         help='Pass this option to extract files found'
+#     )
+
+# argparser.add_argument(
+#         '-l', '--live',
+#         dest='live',
+#         action="store_true",
+#         default=False,
+#         required=False,
+#         help='determines if this is live or dead acquisition'
+#     )
 
 
 args = argparser.parse_args()
@@ -90,17 +96,18 @@ class ewf_Img_Info(pytsk3.Img_Info):
   def get_size(self):
     return self._ewf_handle.get_media_size()
 
-def checkAdmin():
-    if not admin.isUserAdmin():
-      admin.runAsAdmin()
-      sys.exit()
+def mount():
+
+  filenames = pyewf.glob(args.imagefile)
+  ewf_handle = pyewf.handle()
+  ewf_handle.open(filenames)
+  imagehandle = ewf_Img_Info(ewf_handle)
+
+  return imagehandle
 
 def output():
-    if args.live == True:
-        output = args.output +"/"+ gethostname()
-
-    elif args.imagefile != None:
-        output = args.output +"/"+ args.imagefile
+    if args.imagefile != None:
+        output = args.output +"/"+ ntpath.basename(args.imagefile)
 
     else:
         output = args.output
@@ -109,8 +116,6 @@ def output():
 
 if __name__ == "__main__":
 
-	checkAdmin()
-    #get_processes(output())
-    #get_updates(output())
-	timeline(args.imagefile,output(),args.path,args.search)
-    #collectFromDisk(imagefile,output())
+    # collectFromDisk(mount(),output())
+    timeline(args.imagefile,mount(),output(),'/','.*')
+    

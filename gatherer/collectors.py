@@ -1,7 +1,6 @@
 __author__ = 'spydir'
 import pytsk3
 import datetime
-#import wmi
 import json
 import csv
 import sys
@@ -14,58 +13,8 @@ import csv
 import os
 import re
 import psutil
+import ntpath
 from artifacts import files
-
-# def get_processes(output):
-    # outdir = output + "/vol"
-    # if not os.path.exists(outdir): os.makedirs(outdir)
-    # output = output + "/vol/processes.json"
-    # c = wmi.WMI()
-    # process_list = []
-
-    # for process in c.Win32_Process ():
-        # data = { 'name': process.Name,
-             # 'pid': process.ProcessId,
-             # 'ppid': process.ParentProcessID,
-             # 'path': process.ExecutablePath,
-             # 'cmdline': process.CommandLine }
-        # process_list.append(data)
-
-    # with open(output,'w') as outfile:
-        # for i in process_list:
-            # json.dump(i, outfile)
-
-# def get_startup(output):
-    # outdir = output + "/vol"
-    # if not os.path.exists(outdir): os.makedirs(outdir)
-    # output = output + "/vol/startup.json"
-    # c = wmi.WMI()
-    # startup_list = []
-
-    # for s in c.Win32_StartupCommand ():
-
-        # print "[%s] %s <%s>" % (s.Location, s.Caption, s.Command)
-
-# def get_updates(output):
-    # outdir = output + "/vol"
-    # if not os.path.exists(outdir): os.makedirs(outdir)
-    # output = output + "/vol/updates.json"
-    # c = wmi.WMI()
-    # patch_list = []
-    # for patch in c.Win32_QuickFixEngineering():
-        # data = { 'Description': patch.Description,
-             # 'HotFixID': patch.HotFixID,
-             # 'InstalledOn': patch.InstalledOn }
-
-        # patch_list.append(data)
-
-    # with open(output,'w') as outfile:
-        # for i in patch_list:
-            # json.dump(i, outfile)
-
-# def get_network(output):
-    # output = output + "/vol/network.json"
-    # pass
 
 def directoryRecurse(directoryObject, parentPath,search):
   for entryObject in directoryObject:
@@ -98,29 +47,24 @@ def directoryRecurse(directoryObject, parentPath,search):
             searchResult = re.match(search,entryObject.info.name.name)
             if not searchResult:
               continue
-            #print "File:",parentPath,entryObject.info.name.name,entryObject.info.meta.size
+   
             BUFF_SIZE = 1024 * 1024
             offset=0
             md5hash = hashlib.md5()
             sha1hash = hashlib.sha1()
-            # if args.extract == True:
-            #       if not os.path.exists(outputPath):
-            #         os.makedirs(outputPath)
-            #       extractFile = open(outputPath+entryObject.info.name.name,'w')
+            sha256hash = hashlib.sha256()
+
             while offset < entryObject.info.meta.size:
                 available_to_read = min(BUFF_SIZE, entryObject.info.meta.size - offset)
                 filedata = entryObject.read_random(offset,available_to_read)
                 md5hash.update(filedata)
                 sha1hash.update(filedata)
+                sha256hash.update(filedata)
                 offset += len(filedata)
-            #     if args.extract == True:
-            #       extractFile.write(filedata)
-            #
-            # if args.extract == True:
-            #     extractFile.close
-            wr.writerow([int(entryObject.info.meta.addr),'/'.join(parentPath)+entryObject.info.name.name,datetime.datetime.fromtimestamp(entryObject.info.meta.crtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.mtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.atime).strftime('%Y-%m-%d %H:%M:%S'),int(entryObject.info.meta.size),md5hash.hexdigest(),sha1hash.hexdigest()])
+
+            wr.writerow([int(entryObject.info.meta.addr),'/'.join(parentPath)+entryObject.info.name.name,datetime.datetime.fromtimestamp(entryObject.info.meta.crtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.mtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.atime).strftime('%Y-%m-%d %H:%M:%S'),int(entryObject.info.meta.size),md5hash.hexdigest(),sha1hash.hexdigest(),sha256hash.hexdigest()])
         elif f_type == pytsk3.TSK_FS_NAME_TYPE_REG and entryObject.info.meta.size == 0:
-            wr.writerow([int(entryObject.info.meta.addr),'/'.join(parentPath)+entryObject.info.name.name,datetime.datetime.fromtimestamp(entryObject.info.meta.crtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.mtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.atime).strftime('%Y-%m-%d %H:%M:%S'),int(entryObject.info.meta.size),"d41d8cd98f00b204e9800998ecf8427e","da39a3ee5e6b4b0d3255bfef95601890afd80709"])
+            wr.writerow([int(entryObject.info.meta.addr),'/'.join(parentPath)+entryObject.info.name.name,datetime.datetime.fromtimestamp(entryObject.info.meta.crtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.mtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.atime).strftime('%Y-%m-%d %H:%M:%S'),int(entryObject.info.meta.size),"d41d8cd98f00b204e9800998ecf8427e","da39a3ee5e6b4b0d3255bfef95601890afd80709","e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"])
 
         else:
           print "This went wrong",entryObject.info.name.name,f_type
@@ -128,24 +72,6 @@ def directoryRecurse(directoryObject, parentPath,search):
       except IOError as e:
         #print e
         continue
-
-def timeline(imagefile,output,dirPath,search):
-    if not os.path.exists(output): os.makedirs(output)
-    output = output + str(imagefile) +".csv"
-    outfile = open(output,'wb')
-    outfile.write('"Inode","Full Path","Creation Time","Modified Time","Accessed Time","Size","MD5 Hash","SHA1 Hash"\n')
-    global wr
-    wr = csv.writer(outfile, quoting=csv.QUOTE_ALL)
-
-    imagehandle = pytsk3.Img_Info(imagefile)
-    partitionTable = pytsk3.Volume_Info(imagehandle)
-    for partition in partitionTable:
-	  print partition.desc
-	  if 'NTFS' in partition.desc:
-		filesystemObject = pytsk3.FS_Info(imagehandle, offset=(partition.start*512))
-		directoryObject = filesystemObject.open_dir(path=dirPath)
-		print "Directory:",dirPath
-		directoryRecurse(directoryObject,[],search)
 
 """
 CollectFromDisk is designed to extract a predefined set of files from a disk image or live disk.
@@ -157,11 +83,11 @@ of files to collect, and a list of full directories to collect. It is possible t
 directory and export every file in the directory structure, however this is likely very time consuming.
 """
 
-def collectFromDisk(imagefile,output):
+def collectFromDisk(imagehandle,output):
 
-    imagehandle = pytsk3.Img_Info(imagefile) #Img_Info opens and stores general information about a disk
+    #imagehandle = pytsk3.Img_Info(imagefile) #Img_Info opens and stores general information about a disk
     partitionTable = pytsk3.Volume_Info(imagehandle) #The partition table is returned from the Volume_Info function
-
+    print partitionTable
     """
     **This may not be entirely accurate and I need to do more research, but it's the basic idea.
 
@@ -173,7 +99,7 @@ def collectFromDisk(imagefile,output):
     """
     for partition in partitionTable:
       print partition.addr, partition.desc, "%ss(%s)" % (partition.start, partition.start * 512), partition.len
-      if 'Basic data partition' in partition.desc:
+      if 'Basic data partition' or 'NTFS' in partition.desc:
         try:
             """
             This loop iterates through the list of files specified for acquisition. This loop assumes that 'files'
@@ -268,3 +194,19 @@ def collectFromDisk(imagefile,output):
         except:
             pass
 
+def timeline(imagefile,imagehandle,output,dirPath,search):
+    if not os.path.exists(output): os.makedirs(output)
+    output = output + "_File_Metadata_"+".csv"
+    outfile = open(output,'wb')
+    outfile.write('"Inode","Full Path","Creation Time","Modified Time","Accessed Time","Size","MD5 Hash","SHA1 Hash","SHA256 HASH"\n')
+    global wr
+    wr = csv.writer(outfile, quoting=csv.QUOTE_ALL)
+
+    partitionTable = pytsk3.Volume_Info(imagehandle)
+    for partition in partitionTable:
+      print partition.desc
+      if 'NTFS' in partition.desc:
+        filesystemObject = pytsk3.FS_Info(imagehandle, offset=(partition.start*512))
+        directoryObject = filesystemObject.open_dir(path=dirPath)
+        print "Directory:",dirPath
+        directoryRecurse(directoryObject,[],search)
