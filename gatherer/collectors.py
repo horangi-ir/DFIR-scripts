@@ -16,8 +16,12 @@ import psutil
 import ntpath
 from artifacts import files
 
-def directoryRecurse(directoryObject, parentPath,search):
-  for entryObject in directoryObject:
+
+def directoryRecurse(directoryObject, parentPath):
+
+    search = ".*"
+
+    for entryObject in directoryObject:
       if entryObject.info.name.name in [".", ".."]:
         continue
       #print entryObject.info.name.name
@@ -36,54 +40,62 @@ def directoryRecurse(directoryObject, parentPath,search):
 
         if f_type == pytsk3.TSK_FS_NAME_TYPE_DIR:
             sub_directory = entryObject.as_directory()
-            print "Entering Directory: %s" % filepath
+            # print "Entering Directory: %s" % filepath
             parentPath.append(entryObject.info.name.name)
-            directoryRecurse(sub_directory,parentPath,search)
+            directoryRecurse(sub_directory,parentPath)
             parentPath.pop(-1)
-            print "Leaving Directory: %s" % filepath
+            # print "Leaving Directory: %s" % filepath
 
 
-        elif f_type == pytsk3.TSK_FS_NAME_TYPE_REG and entryObject.info.meta.size != 0:
-            searchResult = re.match(search,entryObject.info.name.name)
-            if not searchResult:
+        elif f_type == pytsk3.TSK_FS_NAME_TYPE_REG and entryObject.info.name.name.lower().endswith((".exe",".dll")):
+            print entryObject.info.name.name
+
+            if entryObject.info.meta.size != 0:
+            
+
+                #print "File:",parentPath,entryObject.info.name.name,entryObject.info.meta.size
+                BUFF_SIZE = 1024 * 1024
+                offset=0
+                md5hash = hashlib.md5()
+                sha1hash = hashlib.sha1()
+                # if args.extract == True:
+                #       if not os.path.exists(outputPath):
+                #         os.makedirs(outputPath)
+                #       extractFile = open(outputPath+entryObject.info.name.name,'w')
+                while offset < entryObject.info.meta.size:
+                    available_to_read = min(BUFF_SIZE, entryObject.info.meta.size - offset)
+                    filedata = entryObject.read_random(offset,available_to_read)
+                    md5hash.update(filedata)
+                    sha1hash.update(filedata)
+                    offset += len(filedata)
+                #     if args.extract == True:
+                #       extractFile.write(filedata)
+                #
+                # if args.extract == True:
+                #     extractFile.close
+                wr.writerow([int(entryObject.info.meta.addr),'/'.join(parentPath)+entryObject.info.name.name,datetime.datetime.fromtimestamp(entryObject.info.meta.crtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.mtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.atime).strftime('%Y-%m-%d %H:%M:%S'),int(entryObject.info.meta.size),md5hash.hexdigest(),sha1hash.hexdigest()])
+            elif f_type == pytsk3.TSK_FS_NAME_TYPE_REG and entryObject.info.meta.size == 0:
+                wr.writerow([int(entryObject.info.meta.addr),'/'.join(parentPath)+entryObject.info.name.name,datetime.datetime.fromtimestamp(entryObject.info.meta.crtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.mtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.atime).strftime('%Y-%m-%d %H:%M:%S'),int(entryObject.info.meta.size),"d41d8cd98f00b204e9800998ecf8427e","da39a3ee5e6b4b0d3255bfef95601890afd80709"])
+
+            else:
               continue
-   
-            BUFF_SIZE = 1024 * 1024
-            offset=0
-            md5hash = hashlib.md5()
-            sha1hash = hashlib.sha1()
-            sha256hash = hashlib.sha256()
-
-            while offset < entryObject.info.meta.size:
-                available_to_read = min(BUFF_SIZE, entryObject.info.meta.size - offset)
-                filedata = entryObject.read_random(offset,available_to_read)
-                md5hash.update(filedata)
-                sha1hash.update(filedata)
-                sha256hash.update(filedata)
-                offset += len(filedata)
-
-            wr.writerow([int(entryObject.info.meta.addr),'/'.join(parentPath)+entryObject.info.name.name,datetime.datetime.fromtimestamp(entryObject.info.meta.crtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.mtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.atime).strftime('%Y-%m-%d %H:%M:%S'),int(entryObject.info.meta.size),md5hash.hexdigest(),sha1hash.hexdigest(),sha256hash.hexdigest()])
-        elif f_type == pytsk3.TSK_FS_NAME_TYPE_REG and entryObject.info.meta.size == 0:
-            wr.writerow([int(entryObject.info.meta.addr),'/'.join(parentPath)+entryObject.info.name.name,datetime.datetime.fromtimestamp(entryObject.info.meta.crtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.mtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.atime).strftime('%Y-%m-%d %H:%M:%S'),int(entryObject.info.meta.size),"d41d8cd98f00b204e9800998ecf8427e","da39a3ee5e6b4b0d3255bfef95601890afd80709","e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"])
-
-        else:
-          print "This went wrong",entryObject.info.name.name,f_type
+                  # print "This went wrong",entryObject.info.name.name,f_type
 
       except IOError as e:
         #print e
         continue
 
-"""
-CollectFromDisk is designed to extract a predefined set of files from a disk image or live disk.
-It makes heavy use of the pytsk3 library to mount the image, identify files, and move them to a
-specified output directory.
-
-collectFromDisk currently takes 5 arguments, the imagefile in question, the output directory, a list
-of files to collect, and a list of full directories to collect. It is possible to include the root
-directory and export every file in the directory structure, however this is likely very time consuming.
-"""
 
 def collectFromDisk(imagehandle,output):
+    
+    """CollectFromDisk is designed to extract a predefined set of files from a disk image or live disk.
+    It makes heavy use of the pytsk3 library to mount the image, identify files, and move them to a
+    specified output directory.
+
+    collectFromDisk currently takes 5 arguments, the imagefile in question, the output directory, a list
+    of files to collect, and a list of full directories to collect. It is possible to include the root
+    directory and export every file in the directory structure, however this is likely very time consuming.
+    """
 
     #imagehandle = pytsk3.Img_Info(imagefile) #Img_Info opens and stores general information about a disk
     partitionTable = pytsk3.Volume_Info(imagehandle) #The partition table is returned from the Volume_Info function
@@ -194,19 +206,18 @@ def collectFromDisk(imagehandle,output):
         except:
             pass
 
-def timeline(imagefile,imagehandle,output,dirPath,search):
+def timeline(mountData,output):
+    iPartitions, imagehandle, dirPath = mountData
+
     if not os.path.exists(output): os.makedirs(output)
-    output = output + "_File_Metadata_"+".csv"
+    output = output + "_Hash_List" +".csv"
     outfile = open(output,'wb')
-    outfile.write('"Inode","Full Path","Creation Time","Modified Time","Accessed Time","Size","MD5 Hash","SHA1 Hash","SHA256 HASH"\n')
+    outfile.write('"Inode","Full Path","Creation Time","Modified Time","Accessed Time","Size","MD5 Hash","SHA1 Hash"\n')
     global wr
     wr = csv.writer(outfile, quoting=csv.QUOTE_ALL)
 
-    partitionTable = pytsk3.Volume_Info(imagehandle)
-    for partition in partitionTable:
-      print partition.desc
-      if 'NTFS' in partition.desc:
+    for partition in iPartitions:
         filesystemObject = pytsk3.FS_Info(imagehandle, offset=(partition.start*512))
         directoryObject = filesystemObject.open_dir(path=dirPath)
         print "Directory:",dirPath
-        directoryRecurse(directoryObject,[],search)
+        directoryRecurse(directoryObject,[])

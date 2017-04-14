@@ -11,7 +11,6 @@ import csv
 import os
 import re
 import psutil
-import admin
 from socket import gethostname
 import ntpath
 from collectors import *
@@ -28,16 +27,6 @@ argparser.add_argument(
         help='E01 to extract from'
     )
 
-# argparser.add_argument(
-#         '-p', '--path',
-#         dest='path',
-#         action="store",
-#         type=str,
-#         default='/',
-#         required=False,
-#         help='Path to recurse from, defaults to /'
-#     )
-
 argparser.add_argument(
         '-o', '--output',
         dest='output',
@@ -47,34 +36,6 @@ argparser.add_argument(
         required=True,
         help='File to write the hashes to'
     )
-
-# argparser.add_argument(
-#         '-s', '--search',
-#         dest='search',
-#         action="store",
-#         type=str,
-#         default='.*',
-#         required=False,
-#         help='Specify search parameter e.g. *.lnk'
-#     )
-
-# argparser.add_argument(
-#         '-e', '--extract',
-#         dest='extract',
-#         action="store_true",
-#         default=False,
-#         required=False,
-#         help='Pass this option to extract files found'
-#     )
-
-# argparser.add_argument(
-#         '-l', '--live',
-#         dest='live',
-#         action="store_true",
-#         default=False,
-#         required=False,
-#         help='determines if this is live or dead acquisition'
-#     )
 
 
 args = argparser.parse_args()
@@ -96,14 +57,21 @@ class ewf_Img_Info(pytsk3.Img_Info):
   def get_size(self):
     return self._ewf_handle.get_media_size()
 
-def mount():
+def mount(imagefile,dirPath):
+    iPartitions = []
 
-  filenames = pyewf.glob(args.imagefile)
-  ewf_handle = pyewf.handle()
-  ewf_handle.open(filenames)
-  imagehandle = ewf_Img_Info(ewf_handle)
+    filenames = pyewf.glob(imagefile)
+    ewf_handle = pyewf.handle()
+    ewf_handle.open(filenames)
+    imagehandle = ewf_Img_Info(ewf_handle)
 
-  return imagehandle
+    partitionTable = pytsk3.Volume_Info(imagehandle)
+    for partition in partitionTable:
+      print partition.desc
+      if 'NTFS' in partition.desc  or 'Basic data partition' in partition.desc:
+        iPartitions.append(partition)
+
+    return iPartitions, imagehandle, dirPath
 
 def output():
     if args.imagefile != None:
@@ -116,6 +84,7 @@ def output():
 
 if __name__ == "__main__":
 
-    # collectFromDisk(mount(),output())
-    timeline(args.imagefile,mount(),output(),'/','.*')
+    #collectFromDisk(mount(),output())
+    # print mount(args.imagefile,"/")
+    timeline(mount(args.imagefile,"/"),output(),)
     
