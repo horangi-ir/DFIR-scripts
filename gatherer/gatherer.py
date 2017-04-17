@@ -83,15 +83,16 @@ class investigation():
 
         self.imagefile = args.imagefile
         self.outpath = args.output
+        self.extractFromDisk = True
         self.getHashList = True
         self.antivirus = False
-        self.extract = False
+        
 
 
     def output(self):
         if self.imagefile != None:
             output = self.outpath +"/"+ os.path.basename(self.imagefile)
-            hashOutput = self.outpath + "/"+ os.path.basename(output) +"_Hash_List" +".csv"
+            hashOutput = self.outpath +"/" +os.path.basename(self.imagefile) +"/"+ os.path.basename(output) +"_Hash_List" +".csv"
         
         else:
             output = self.outpath
@@ -108,31 +109,32 @@ class investigation():
 
         return partitionTable, imagehandle
 
-    def partitions(self, dirPath):
+    def analysis(self, dirPath):
 
         partitionTable, imagehandle = self.readImageFile(self.imagefile)
 
         for partition in partitionTable:
             print partition.desc
             if 'NTFS' in partition.desc or 'Basic data partition' in partition.desc or 'Win95 FAT32' in partition.desc:
-                filesystemObject = pytsk3.FS_Info(imagehandle, offset=(partition.start*512))
-                directoryObject = filesystemObject.open_dir(path=dirPath)
-                print "Directory:",dirPath
+
+                if self.extractFromDisk == True:
+                    extractFromDisk(imagehandle,partition,self.output()[0])
 
                 if self.getHashList == True:
+                    filesystemObject = pytsk3.FS_Info(imagehandle, offset=(partition.start*512))
+                    directoryObject = filesystemObject.open_dir(path=dirPath)
+                    print "Directory:",dirPath
                     if not os.path.exists(self.output()[0]): os.makedirs(self.output()[0])
                     outfile = open(self.output()[1],'wb')
-                    outfile.write('"Inode","Full Path","Creation Time","Modified Time","Accessed Time","Size","MD5 Hash","SHA1 Hash"\n')
+                    outfile.write('"Inode","Full Path","Creation Time","Modified Time","Accessed Time","Size","MD5 Hash","SHA1 Hash","SHA256 HASH"\n')
                     hashOutput = csv.writer(outfile, quoting=csv.QUOTE_ALL)
+                    self.directoryRecurse(directoryObject,[],hashOutput)
                 
-                self.analysis(directoryObject,[],hashOutput)
 
 
-
-    def analysis(self,directoryObject, parentPath, hashOutput):
+    def directoryRecurse(self,directoryObject, parentPath, hashOutput):
 
             search = ".*"
-
 
             for entryObject in directoryObject:
                 if entryObject.info.name.name in [".", ".."]:
@@ -155,7 +157,7 @@ class investigation():
                         sub_directory = entryObject.as_directory()
                         # print "Entering Directory: %s" % filepath
                         parentPath.append(entryObject.info.name.name)
-                        self.analysis(sub_directory,parentPath,hashOutput)
+                        self.directoryRecurse(sub_directory,parentPath,hashOutput)
                         parentPath.pop(-1)
                         # print "Leaving Directory: %s" % filepath
 
@@ -164,12 +166,12 @@ class investigation():
                         
                         # print entryObject.info.name.name
                         try: 
-                            with Timeout(1):
-
+                            with Timeout(10):
+                                print "Hashing: ", filepath
                                 hashList(self.output(), entryObject, parentPath,hashOutput)
                         
                         except Timeout.Timeout:
-                            print "Timeout"
+                            print "Timeout: ", filepath
  
 
                 except IOError as e:
@@ -179,6 +181,5 @@ class investigation():
 if __name__ == "__main__":
 
     disk1 = investigation()
-    disk1.partitions("/")
-    # timeline(mount(args.imagefile,"/"),output(),)
+    disk1.analysis("/")
     
