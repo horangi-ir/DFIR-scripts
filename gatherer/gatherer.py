@@ -16,6 +16,9 @@ import ntpath
 from os.path import basename
 from collectors import *
 from timeout import Timeout
+import signal
+
+
 
 argparser = argparse.ArgumentParser(description='Hash files recursively from all NTFS parititions in a live system and optionally extract them')
 
@@ -26,8 +29,7 @@ argparser.add_argument(
         type=str,
         default=None,
         required=False,
-        help='E01 to extract from'
-    )
+        help='E01 to extract from')
 
 argparser.add_argument(
         '-o', '--output',
@@ -36,9 +38,7 @@ argparser.add_argument(
         type=str,
         default='inventory.csv',
         required=True,
-        help='File to write the hashes to'
-    )
-
+        help='File to write the hashes to')
 
 args = argparser.parse_args()
 
@@ -145,12 +145,11 @@ class investigation():
                         
                         # print entryObject.info.name.name
                         try: 
-                            with Timeout(3):
+                                
                                 print "Hashing: ", filepath
                                 hashList(self.output(imagefile), entryObject, parentPath,hashOutput)
                         
-                        except Timeout.Timeout:
-                            print "Timeout: ", filepath
+                        except:
                             continue
  
 

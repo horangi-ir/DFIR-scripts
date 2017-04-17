@@ -16,8 +16,7 @@ import psutil
 import ntpath
 from os.path import basename
 from artifacts import files
-from timeout import Timeout 
-
+from timeout import Timeout
 
 def hashList(output, entryObject, parentPath,hashOutput):
     # if self.getHashList == True:
@@ -38,18 +37,25 @@ def hashList(output, entryObject, parentPath,hashOutput):
         sha256hash = hashlib.sha256()
 
         while offset < entryObject.info.meta.size:
+
             try: 
-                with Timeout(3):
-                              
+                # with Timeout(3):
+                    # print "Reading File Data"   
                     available_to_read = min(BUFF_SIZE, entryObject.info.meta.size - offset)
                     filedata = entryObject.read_random(offset,available_to_read)
                     md5hash.update(filedata)
                     sha1hash.update(filedata)
                     sha256hash.update(filedata)
-                    offset += len(filedata)
+                    if len(filedata) == 0:
+                        offset = entryObject.info.meta.size +1
+                    else: 
+                        offset += len(filedata)
+  
 
-            except Timeout.Timeout:
-                print "Timeout: ", filepath
+            except:
+            # except Timeout.Timeout:
+                # print "Timeout: ", filepath
+                pass
 
         # if args.extract == True:
         #    extractFile.write(filedata)
