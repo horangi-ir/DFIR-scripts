@@ -11,11 +11,12 @@ import csv
 import os
 import re
 import psutil
+import time
 from socket import gethostname
 import ntpath
 from os.path import basename
+import subprocess
 from collectors import *
-from timeout import Timeout
 import signal
 
 
@@ -65,10 +66,9 @@ class investigation():
 
         self.evidenceDir = args.imagefile
         self.outpath = args.output
-        self.extractFromDisk = True
-        self.getHashList = True
-        self.antivirus = False
-
+        self.extractFromDisk = False
+        self.getHashList = False
+        self.antivirus = True
 
     def output(self,imagefile):
         if imagefile != None:
@@ -110,6 +110,12 @@ class investigation():
                     outfile.write('"Inode","Full Path","Creation Time","Modified Time","Accessed Time","Size","MD5 Hash","SHA1 Hash","SHA256 HASH"\n')
                     hashOutput = csv.writer(outfile, quoting=csv.QUOTE_ALL)
                     self.directoryRecurse(directoryObject,[],hashOutput,imagefile)
+
+                if self.antivirus == True:
+
+                    self.mount(imagefile,partition)
+                    time.sleep(15)
+                    self.umount()
 
     def directoryRecurse(self,directoryObject, parentPath, hashOutput,imagefile):
 
@@ -156,6 +162,41 @@ class investigation():
                 except IOError as e:
                     #print e
                     continue
+
+    def mount(self,imagefile,partition):
+        
+
+        mountCommand = "mount -o loop,ro,no_exec,show_sys_files,offset=32256"
+
+        if "Win95" in partition.desc:
+            mountCommand = "mount -o loop,ro,offset=32256"
+
+        ewfDir = "/mnt/ewf"
+        ewfFile = "/mnt/ewf/ewf1"
+        mountDir = "/mnt/windows"
+        mountCommand += " " + ewfFile + " " + mountDir
+        ewfMount = "ewfmount " +imagefile + " " + ewfDir
+
+        print "print executing ewfmount"
+        print ewfMount + "\n"
+        subprocess.call(ewfMount, shell=True)
+    
+        # time.sleep(5)
+        print "print executing mount"
+        print mountCommand + "\n"
+        subprocess.call(mountCommand, shell=True)
+    
+    def umount(self):
+        
+        ewfDir = "umount /mnt/ewf"
+        mountDir = "umount /mnt/windows"
+
+
+        print "executing umount on /mnt/windows"
+        subprocess.call(mountDir, shell=True)
+        time.sleep(3)
+        print "executing umount on /mnt/ewf"
+        subprocess.call(ewfDir, shell=True)
 
 def findDisks():
     disks = []

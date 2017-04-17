@@ -16,7 +16,6 @@ import psutil
 import ntpath
 from os.path import basename
 from artifacts import files
-from timeout import Timeout
 
 def hashList(output, entryObject, parentPath,hashOutput):
     # if self.getHashList == True:
@@ -70,7 +69,6 @@ def hashList(output, entryObject, parentPath,hashOutput):
     else:
       pass
           # print "This went wrong",entryObject.info.name.name,f_type
-
 
 def extractFromDisk(imagehandle,partition,output):
     
