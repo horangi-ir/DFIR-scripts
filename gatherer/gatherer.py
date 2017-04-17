@@ -11,6 +11,8 @@ import csv
 import os
 import re
 import psutil
+import signal
+import time
 from socket import gethostname
 import ntpath
 from os.path import basename
@@ -40,6 +42,24 @@ argparser.add_argument(
 
 
 args = argparser.parse_args()
+
+class Timeout():
+    """Timeout class using ALARM signal."""
+    class Timeout(Exception):
+        pass
+ 
+    def __init__(self, sec):
+        self.sec = sec
+ 
+    def __enter__(self):
+        signal.signal(signal.SIGALRM, self.raise_timeout)
+        signal.alarm(self.sec)
+ 
+    def __exit__(self, *args):
+        signal.alarm(0)    # disable alarm
+ 
+    def raise_timeout(self, *args):
+        raise Timeout.Timeout()
 
 class ewf_Img_Info(pytsk3.Img_Info):
   def __init__(self, ewf_handle):
@@ -71,11 +91,12 @@ class investigation():
     def output(self):
         if self.imagefile != None:
             output = self.outpath +"/"+ os.path.basename(self.imagefile)
+            hashOutput = self.outpath + "/"+ os.path.basename(output) +"_Hash_List" +".csv"
         
         else:
             output = self.outpath
 
-        return output
+        return output, hashOutput
 
     def readImageFile(self,imagefile):
         filenames = pyewf.glob(imagefile)
@@ -87,30 +108,77 @@ class investigation():
 
         return partitionTable, imagehandle
 
-    def analysis(self, dirPath):
+    def partitions(self, dirPath):
 
         partitionTable, imagehandle = self.readImageFile(self.imagefile)
 
         for partition in partitionTable:
             print partition.desc
             if 'NTFS' in partition.desc or 'Basic data partition' in partition.desc or 'Win95 FAT32' in partition.desc:
+                filesystemObject = pytsk3.FS_Info(imagehandle, offset=(partition.start*512))
+                directoryObject = filesystemObject.open_dir(path=dirPath)
+                print "Directory:",dirPath
+
                 if self.getHashList == True:
-                    hashList(partition,imagehandle,self.output(), dirPath)
-                    
-                elif self.extract == True:
+                    if not os.path.exists(self.output()[0]): os.makedirs(self.output()[0])
+                    outfile = open(self.output()[1],'wb')
+                    outfile.write('"Inode","Full Path","Creation Time","Modified Time","Accessed Time","Size","MD5 Hash","SHA1 Hash"\n')
+                    hashOutput = csv.writer(outfile, quoting=csv.QUOTE_ALL)
+                
+                self.analysis(directoryObject,[],hashOutput)
+
+
+
+    def analysis(self,directoryObject, parentPath, hashOutput):
+
+            search = ".*"
+
+
+            for entryObject in directoryObject:
+                if entryObject.info.name.name in [".", ".."]:
                     continue
+                  #print entryObject.info.name.name
+                try:
+                    f_type = entryObject.info.name.type
+                    size = entryObject.info.meta.size
+                except Exception as error:
+                      #print "Cannot retrieve type or size of",entryObject.info.name.name
+                      #print error.message
+                      continue
 
-                elif self.antivirus == True:
+                try:
+
+                    filepath = '/%s/%s' % ('/'.join(parentPath),entryObject.info.name.name)
+                    outputPath ='./%s/' % ('/'.join(parentPath))
+
+                    if f_type == pytsk3.TSK_FS_NAME_TYPE_DIR:
+                        sub_directory = entryObject.as_directory()
+                        # print "Entering Directory: %s" % filepath
+                        parentPath.append(entryObject.info.name.name)
+                        self.analysis(sub_directory,parentPath,hashOutput)
+                        parentPath.pop(-1)
+                        # print "Leaving Directory: %s" % filepath
+
+
+                    elif f_type == pytsk3.TSK_FS_NAME_TYPE_REG and entryObject.info.name.name.lower().endswith((".exe",".dll")):
+                        
+                        # print entryObject.info.name.name
+                        try: 
+                            with Timeout(1):
+
+                                hashList(self.output(), entryObject, parentPath,hashOutput)
+                        
+                        except Timeout.Timeout:
+                            print "Timeout"
+ 
+
+                except IOError as e:
+                    #print e
                     continue
-
-
-
-    
-
 
 if __name__ == "__main__":
 
     disk1 = investigation()
-    disk1.analysis("/")
+    disk1.partitions("/")
     # timeline(mount(args.imagefile,"/"),output(),)
     
