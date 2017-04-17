@@ -11,12 +11,11 @@ import csv
 import os
 import re
 import psutil
-import signal
-import time
 from socket import gethostname
 import ntpath
 from os.path import basename
 from collectors import *
+from timeout import Timeout
 
 argparser = argparse.ArgumentParser(description='Hash files recursively from all NTFS parititions in a live system and optionally extract them')
 
@@ -43,23 +42,6 @@ argparser.add_argument(
 
 args = argparser.parse_args()
 
-class Timeout():
-    """Timeout class using ALARM signal."""
-    class Timeout(Exception):
-        pass
- 
-    def __init__(self, sec):
-        self.sec = sec
- 
-    def __enter__(self):
-        signal.signal(signal.SIGALRM, self.raise_timeout)
-        signal.alarm(self.sec)
- 
-    def __exit__(self, *args):
-        signal.alarm(0)    # disable alarm
- 
-    def raise_timeout(self, *args):
-        raise Timeout.Timeout()
 
 class ewf_Img_Info(pytsk3.Img_Info):
   def __init__(self, ewf_handle):
@@ -81,18 +63,17 @@ class ewf_Img_Info(pytsk3.Img_Info):
 class investigation():
     def __init__(self):
 
-        self.imagefile = args.imagefile
+        self.evidenceDir = args.imagefile
         self.outpath = args.output
         self.extractFromDisk = True
         self.getHashList = True
         self.antivirus = False
-        
 
 
-    def output(self):
-        if self.imagefile != None:
-            output = self.outpath +"/"+ os.path.basename(self.imagefile)
-            hashOutput = self.outpath +"/" +os.path.basename(self.imagefile) +"/"+ os.path.basename(output) +"_Hash_List" +".csv"
+    def output(self,imagefile):
+        if imagefile != None:
+            output = self.outpath +"/"+ os.path.basename(imagefile)
+            hashOutput = self.outpath +"/" +os.path.basename(imagefile) +"/"+ os.path.basename(output) +"_Hash_List" +".csv"
         
         else:
             output = self.outpath
@@ -109,30 +90,28 @@ class investigation():
 
         return partitionTable, imagehandle
 
-    def analysis(self, dirPath):
+    def analysis(self, dirPath, imagefile):
 
-        partitionTable, imagehandle = self.readImageFile(self.imagefile)
+        partitionTable, imagehandle = self.readImageFile(imagefile)
 
         for partition in partitionTable:
             print partition.desc
             if 'NTFS' in partition.desc or 'Basic data partition' in partition.desc or 'Win95 FAT32' in partition.desc:
 
                 if self.extractFromDisk == True:
-                    extractFromDisk(imagehandle,partition,self.output()[0])
+                    extractFromDisk(imagehandle,partition,self.output(imagefile)[0])
 
                 if self.getHashList == True:
                     filesystemObject = pytsk3.FS_Info(imagehandle, offset=(partition.start*512))
                     directoryObject = filesystemObject.open_dir(path=dirPath)
                     print "Directory:",dirPath
-                    if not os.path.exists(self.output()[0]): os.makedirs(self.output()[0])
-                    outfile = open(self.output()[1],'wb')
+                    if not os.path.exists(self.output(imagefile)[0]): os.makedirs(self.output(imagefile)[0])
+                    outfile = open(self.output(imagefile)[1],'wb')
                     outfile.write('"Inode","Full Path","Creation Time","Modified Time","Accessed Time","Size","MD5 Hash","SHA1 Hash","SHA256 HASH"\n')
                     hashOutput = csv.writer(outfile, quoting=csv.QUOTE_ALL)
-                    self.directoryRecurse(directoryObject,[],hashOutput)
-                
+                    self.directoryRecurse(directoryObject,[],hashOutput,imagefile)
 
-
-    def directoryRecurse(self,directoryObject, parentPath, hashOutput):
+    def directoryRecurse(self,directoryObject, parentPath, hashOutput,imagefile):
 
             search = ".*"
 
@@ -157,7 +136,7 @@ class investigation():
                         sub_directory = entryObject.as_directory()
                         # print "Entering Directory: %s" % filepath
                         parentPath.append(entryObject.info.name.name)
-                        self.directoryRecurse(sub_directory,parentPath,hashOutput)
+                        self.directoryRecurse(sub_directory,parentPath,hashOutput,imagefile)
                         parentPath.pop(-1)
                         # print "Leaving Directory: %s" % filepath
 
@@ -166,20 +145,36 @@ class investigation():
                         
                         # print entryObject.info.name.name
                         try: 
-                            with Timeout(10):
+                            with Timeout(3):
                                 print "Hashing: ", filepath
-                                hashList(self.output(), entryObject, parentPath,hashOutput)
+                                hashList(self.output(imagefile), entryObject, parentPath,hashOutput)
                         
                         except Timeout.Timeout:
                             print "Timeout: ", filepath
+                            continue
  
 
                 except IOError as e:
                     #print e
                     continue
 
+def findDisks():
+    disks = []
+    for root, dirs, files in os.walk(args.imagefile):
+        for name in files:
+            if name.endswith((".E01")):
+                if os.path.isfile(os.path.join(root,name)):
+                    if "RECYCLE" not in os.path.join(root,name):
+                        disks.append(os.path.join(root,name))
+    return disks
+
 if __name__ == "__main__":
 
-    disk1 = investigation()
-    disk1.analysis("/")
+    # disk1 = investigation()
+    # disk1.findDisks()
+    for index,item in enumerate(findDisks()):
+        index = investigation()
+        index.analysis("/", item)
+
+    # disk1.analysis("/")
     

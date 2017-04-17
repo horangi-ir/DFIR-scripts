@@ -16,6 +16,7 @@ import psutil
 import ntpath
 from os.path import basename
 from artifacts import files
+from timeout import Timeout 
 
 
 def hashList(output, entryObject, parentPath,hashOutput):
@@ -37,12 +38,19 @@ def hashList(output, entryObject, parentPath,hashOutput):
         sha256hash = hashlib.sha256()
 
         while offset < entryObject.info.meta.size:
-            available_to_read = min(BUFF_SIZE, entryObject.info.meta.size - offset)
-            filedata = entryObject.read_random(offset,available_to_read)
-            md5hash.update(filedata)
-            sha1hash.update(filedata)
-            sha256hash.update(filedata)
-            offset += len(filedata)
+            try: 
+                with Timeout(3):
+                              
+                    available_to_read = min(BUFF_SIZE, entryObject.info.meta.size - offset)
+                    filedata = entryObject.read_random(offset,available_to_read)
+                    md5hash.update(filedata)
+                    sha1hash.update(filedata)
+                    sha256hash.update(filedata)
+                    offset += len(filedata)
+
+            except Timeout.Timeout:
+                print "Timeout: ", filepath
+
         # if args.extract == True:
         #    extractFile.write(filedata)
         #
@@ -50,7 +58,7 @@ def hashList(output, entryObject, parentPath,hashOutput):
         #    extractFile.close
 
         hashOutput.writerow([int(entryObject.info.meta.addr),'/'.join(parentPath)+entryObject.info.name.name,datetime.datetime.fromtimestamp(entryObject.info.meta.crtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.mtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.atime).strftime('%Y-%m-%d %H:%M:%S'),int(entryObject.info.meta.size),md5hash.hexdigest(),sha1hash.hexdigest(),sha256hash.hexdigest()])
-    elif f_type == pytsk3.TSK_FS_NAME_TYPE_REG and entryObject.info.meta.size == 0:
+    elif entryObject.info.meta.size == 0:
         hashOutput.writerow([int(entryObject.info.meta.addr),'/'.join(parentPath)+entryObject.info.name.name,datetime.datetime.fromtimestamp(entryObject.info.meta.crtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.mtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.atime).strftime('%Y-%m-%d %H:%M:%S'),int(entryObject.info.meta.size),"d41d8cd98f00b204e9800998ecf8427e","da39a3ee5e6b4b0d3255bfef95601890afd80709","e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"])
 
     else:
