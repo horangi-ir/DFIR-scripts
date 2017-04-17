@@ -13,6 +13,7 @@ import re
 import psutil
 from socket import gethostname
 import ntpath
+from os.path import basename
 from collectors import *
 
 argparser = argparse.ArgumentParser(description='Hash files recursively from all NTFS parititions in a live system and optionally extract them')
@@ -57,34 +58,67 @@ class ewf_Img_Info(pytsk3.Img_Info):
   def get_size(self):
     return self._ewf_handle.get_media_size()
 
-def mount(imagefile,dirPath):
-    iPartitions = []
+class investigation():
+    def __init__(self):
 
-    filenames = pyewf.glob(imagefile)
-    ewf_handle = pyewf.handle()
-    ewf_handle.open(filenames)
-    imagehandle = ewf_Img_Info(ewf_handle)
+        self.imagefile = args.imagefile
+        self.outpath = args.output
+        self.getHashList = True
+        self.antivirus = False
+        self.extract = False
 
-    partitionTable = pytsk3.Volume_Info(imagehandle)
-    for partition in partitionTable:
-      print partition.desc
-      if 'NTFS' in partition.desc  or 'Basic data partition' in partition.desc:
-        iPartitions.append(partition)
 
-    return iPartitions, imagehandle, dirPath
+    def output(self):
+        if self.imagefile != None:
+            output = self.outpath +"/"+ os.path.basename(self.imagefile)
+        
+        else:
+            output = self.outpath
 
-def output():
-    if args.imagefile != None:
-        output = args.output +"/"+ ntpath.basename(args.imagefile)
+        return output
 
-    else:
-        output = args.output
+    def readImageFile(self,imagefile):
+        filenames = pyewf.glob(imagefile)
+        ewf_handle = pyewf.handle()
+        ewf_handle.open(filenames)
+        imagehandle = ewf_Img_Info(ewf_handle)
 
-    return output
+        partitionTable = pytsk3.Volume_Info(imagehandle)
+
+        return partitionTable, imagehandle
+
+    def analysis(self):
+
+        partitionTable, imagehandle = self.readImageFile(self.imagefile)
+
+        for partition in partitionTable:
+            print partition.desc
+            if 'NTFS' in partition.desc or 'Basic data partition' in partition.desc or 'Win95 FAT32' in partition.desc:
+                if self.getHashList == True:
+                    self.hashList(partition,imagehandle)
+
+
+
+    def hashList(self,partition, imagehandle):
+        output = self.output()
+        if not os.path.exists(output): os.makedirs(output)
+        output = output + "/"+os.path.basename(output)+"_Hash_List_Partition_" + str(partition.addr) +".csv"
+        print output
+        # outfile = open(output,'wb')
+        # outfile.write('"Inode","Full Path","Creation Time","Modified Time","Accessed Time","Size","MD5 Hash","SHA1 Hash"\n')
+        # global wr
+        # wr = csv.writer(outfile, quoting=csv.QUOTE_ALL)
+
+        # for partition in iPartitions:
+        #     filesystemObject = pytsk3.FS_Info(imagehandle, offset=(partition.start*512))
+        #     directoryObject = filesystemObject.open_dir(path=dirPath)
+        #     print "Directory:",dirPath
+        #     directoryRecurse(directoryObject,[])
+
 
 if __name__ == "__main__":
 
-    #collectFromDisk(mount(),output())
-    # print mount(args.imagefile,"/")
-    timeline(mount(args.imagefile,"/"),output(),)
+    disk1 = investigation()
+    disk1.analysis()
+    # timeline(mount(args.imagefile,"/"),output(),)
     
