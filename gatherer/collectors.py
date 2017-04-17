@@ -16,6 +16,7 @@ import psutil
 import ntpath
 from os.path import basename
 from artifacts import files
+import pyclamd
 
 def hashList(output, entryObject, parentPath,hashOutput):
     # if self.getHashList == True:
@@ -127,6 +128,14 @@ def extractFromDisk(imagehandle,partition,output):
         except:
             pass
 
+def clamAV(mountDir):
+    cd = pyclamd.ClamdAgnostic()
+    for root, dirs, files in os.walk(mountDir):
+        for name in files:
+            if os.path.isfile(os.path.join(root,name)):
+                result = cd.scan_file(os.path.join(root,name))
+                print result
 
+    pass
 
 
