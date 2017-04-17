@@ -75,7 +75,7 @@ class investigation():
             output = self.outpath +"/"+ os.path.basename(imagefile)
             hashOutput = self.outpath +"/" +os.path.basename(imagefile) +"/"+ os.path.basename(output) +"_Hash_List" +".csv"
             clamlog = self.outpath +"/" +os.path.basename(imagefile) +"/"+ os.path.basename(output) +"_clamscan_log" +".txt"
-            malwareDir = self.outpath +"/" +os.path.basename(imagefile) +"/"+ os.path.basename(output) +"/malware"
+            malwareDir = self.outpath +"/" +os.path.basename(imagefile)  +"/malware"
 
         else:
             output = self.outpath
@@ -117,10 +117,10 @@ class investigation():
                     if not os.path.exists(self.output(imagefile)[3]): os.makedirs(self.output(imagefile)[3])
                     clamCommand = str("clamscan -r --log="+ self.output(imagefile)[2] +" --copy="+ self.output(imagefile)[3] +" --verbose /mnt/windows")
                     print clamCommand
-                    self.mount(imagefile,partition)
-                    subprocess.call(clamCommand,shell=True)
-                    time.sleep(15)
-                    self.umount()
+                    # self.mount(imagefile,partition)
+                    # subprocess.call(clamCommand,shell=True)
+                    # time.sleep(15)
+                    # self.umount()
 
     def directoryRecurse(self,directoryObject, parentPath, hashOutput,imagefile):
 
