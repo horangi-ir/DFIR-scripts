@@ -17,73 +17,17 @@ import ntpath
 from artifacts import files
 
 
-def directoryRecurse(directoryObject, parentPath):
+def hashList(partition, imagehandle, output, dirPath):
+    if not os.path.exists(output): os.makedirs(output)
+    output = output + "/"+os.path.basename(output)+"_Hash_List_Partition_" + str(partition.addr) +".csv"
+    outfile = open(output,'wb')
+    outfile.write('"Inode","Full Path","Creation Time","Modified Time","Accessed Time","Size","MD5 Hash","SHA1 Hash"\n')
+    wr = csv.writer(outfile, quoting=csv.QUOTE_ALL)
 
-    search = ".*"
-
-    for entryObject in directoryObject:
-      if entryObject.info.name.name in [".", ".."]:
-        continue
-      #print entryObject.info.name.name
-      try:
-        f_type = entryObject.info.name.type
-        size = entryObject.info.meta.size
-      except Exception as error:
-          #print "Cannot retrieve type or size of",entryObject.info.name.name
-          #print error.message
-          continue
-
-      try:
-
-        filepath = '/%s/%s' % ('/'.join(parentPath),entryObject.info.name.name)
-        outputPath ='./%s/' % ('/'.join(parentPath))
-
-        if f_type == pytsk3.TSK_FS_NAME_TYPE_DIR:
-            sub_directory = entryObject.as_directory()
-            # print "Entering Directory: %s" % filepath
-            parentPath.append(entryObject.info.name.name)
-            directoryRecurse(sub_directory,parentPath)
-            parentPath.pop(-1)
-            # print "Leaving Directory: %s" % filepath
-
-
-        elif f_type == pytsk3.TSK_FS_NAME_TYPE_REG and entryObject.info.name.name.lower().endswith((".exe",".dll")):
-            print entryObject.info.name.name
-
-            if entryObject.info.meta.size != 0:
-            
-
-                #print "File:",parentPath,entryObject.info.name.name,entryObject.info.meta.size
-                BUFF_SIZE = 1024 * 1024
-                offset=0
-                md5hash = hashlib.md5()
-                sha1hash = hashlib.sha1()
-                # if args.extract == True:
-                #       if not os.path.exists(outputPath):
-                #         os.makedirs(outputPath)
-                #       extractFile = open(outputPath+entryObject.info.name.name,'w')
-                while offset < entryObject.info.meta.size:
-                    available_to_read = min(BUFF_SIZE, entryObject.info.meta.size - offset)
-                    filedata = entryObject.read_random(offset,available_to_read)
-                    md5hash.update(filedata)
-                    sha1hash.update(filedata)
-                    offset += len(filedata)
-                #     if args.extract == True:
-                #       extractFile.write(filedata)
-                #
-                # if args.extract == True:
-                #     extractFile.close
-                wr.writerow([int(entryObject.info.meta.addr),'/'.join(parentPath)+entryObject.info.name.name,datetime.datetime.fromtimestamp(entryObject.info.meta.crtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.mtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.atime).strftime('%Y-%m-%d %H:%M:%S'),int(entryObject.info.meta.size),md5hash.hexdigest(),sha1hash.hexdigest()])
-            elif f_type == pytsk3.TSK_FS_NAME_TYPE_REG and entryObject.info.meta.size == 0:
-                wr.writerow([int(entryObject.info.meta.addr),'/'.join(parentPath)+entryObject.info.name.name,datetime.datetime.fromtimestamp(entryObject.info.meta.crtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.mtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.atime).strftime('%Y-%m-%d %H:%M:%S'),int(entryObject.info.meta.size),"d41d8cd98f00b204e9800998ecf8427e","da39a3ee5e6b4b0d3255bfef95601890afd80709"])
-
-            else:
-              continue
-                  # print "This went wrong",entryObject.info.name.name,f_type
-
-      except IOError as e:
-        #print e
-        continue
+    filesystemObject = pytsk3.FS_Info(imagehandle, offset=(partition.start*512))
+    directoryObject = filesystemObject.open_dir(path=dirPath)
+    print "Directory:",dirPath
+    directoryRecurse(directoryObject,[])
 
 
 def collectFromDisk(imagehandle,output):
@@ -206,18 +150,70 @@ def collectFromDisk(imagehandle,output):
         except:
             pass
 
-def timeline(mountData,output):
-    iPartitions, imagehandle, dirPath = mountData
+def directoryRecurse(directoryObject, parentPath):
 
-    if not os.path.exists(output): os.makedirs(output)
-    output = output + "_Hash_List" +".csv"
-    outfile = open(output,'wb')
-    outfile.write('"Inode","Full Path","Creation Time","Modified Time","Accessed Time","Size","MD5 Hash","SHA1 Hash"\n')
-    global wr
-    wr = csv.writer(outfile, quoting=csv.QUOTE_ALL)
+        search = ".*"
 
-    for partition in iPartitions:
-        filesystemObject = pytsk3.FS_Info(imagehandle, offset=(partition.start*512))
-        directoryObject = filesystemObject.open_dir(path=dirPath)
-        print "Directory:",dirPath
-        directoryRecurse(directoryObject,[])
+        for entryObject in directoryObject:
+          if entryObject.info.name.name in [".", ".."]:
+            continue
+          #print entryObject.info.name.name
+          try:
+            f_type = entryObject.info.name.type
+            size = entryObject.info.meta.size
+          except Exception as error:
+              #print "Cannot retrieve type or size of",entryObject.info.name.name
+              #print error.message
+              continue
+
+          try:
+
+            filepath = '/%s/%s' % ('/'.join(parentPath),entryObject.info.name.name)
+            outputPath ='./%s/' % ('/'.join(parentPath))
+
+            if f_type == pytsk3.TSK_FS_NAME_TYPE_DIR:
+                sub_directory = entryObject.as_directory()
+                # print "Entering Directory: %s" % filepath
+                parentPath.append(entryObject.info.name.name)
+                directoryRecurse(sub_directory,parentPath)
+                parentPath.pop(-1)
+                # print "Leaving Directory: %s" % filepath
+
+
+            elif f_type == pytsk3.TSK_FS_NAME_TYPE_REG and entryObject.info.name.name.lower().endswith((".exe",".dll")):
+                print entryObject.info.name.name
+
+          #       if entryObject.info.meta.size != 0:
+                
+
+          #           #print "File:",parentPath,entryObject.info.name.name,entryObject.info.meta.size
+          #           BUFF_SIZE = 1024 * 1024
+          #           offset=0
+          #           md5hash = hashlib.md5()
+          #           sha1hash = hashlib.sha1()
+          #           # if args.extract == True:
+          #           #       if not os.path.exists(outputPath):
+          #           #         os.makedirs(outputPath)
+          #           #       extractFile = open(outputPath+entryObject.info.name.name,'w')
+          #           while offset < entryObject.info.meta.size:
+          #               available_to_read = min(BUFF_SIZE, entryObject.info.meta.size - offset)
+          #               filedata = entryObject.read_random(offset,available_to_read)
+          #               md5hash.update(filedata)
+          #               sha1hash.update(filedata)
+          #               offset += len(filedata)
+          #           #     if args.extract == True:
+          #           #       extractFile.write(filedata)
+          #           #
+          #           # if args.extract == True:
+          #           #     extractFile.close
+          #           wr.writerow([int(entryObject.info.meta.addr),'/'.join(parentPath)+entryObject.info.name.name,datetime.datetime.fromtimestamp(entryObject.info.meta.crtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.mtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.atime).strftime('%Y-%m-%d %H:%M:%S'),int(entryObject.info.meta.size),md5hash.hexdigest(),sha1hash.hexdigest()])
+          #       elif f_type == pytsk3.TSK_FS_NAME_TYPE_REG and entryObject.info.meta.size == 0:
+          #           wr.writerow([int(entryObject.info.meta.addr),'/'.join(parentPath)+entryObject.info.name.name,datetime.datetime.fromtimestamp(entryObject.info.meta.crtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.mtime).strftime('%Y-%m-%d %H:%M:%S'),datetime.datetime.fromtimestamp(entryObject.info.meta.atime).strftime('%Y-%m-%d %H:%M:%S'),int(entryObject.info.meta.size),"d41d8cd98f00b204e9800998ecf8427e","da39a3ee5e6b4b0d3255bfef95601890afd80709"])
+
+          #       else:
+          #         continue
+          #             # print "This went wrong",entryObject.info.name.name,f_type
+
+          except IOError as e:
+            #print e
+            continue

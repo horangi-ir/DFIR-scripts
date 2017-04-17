@@ -87,7 +87,7 @@ class investigation():
 
         return partitionTable, imagehandle
 
-    def analysis(self):
+    def analysis(self, dirPath):
 
         partitionTable, imagehandle = self.readImageFile(self.imagefile)
 
@@ -95,30 +95,22 @@ class investigation():
             print partition.desc
             if 'NTFS' in partition.desc or 'Basic data partition' in partition.desc or 'Win95 FAT32' in partition.desc:
                 if self.getHashList == True:
-                    self.hashList(partition,imagehandle)
+                    hashList(partition,imagehandle,self.output(), dirPath)
+                    
+                elif self.extract == True:
+                    continue
+
+                elif self.antivirus == True:
+                    continue
 
 
 
-    def hashList(self,partition, imagehandle):
-        output = self.output()
-        if not os.path.exists(output): os.makedirs(output)
-        output = output + "/"+os.path.basename(output)+"_Hash_List_Partition_" + str(partition.addr) +".csv"
-        print output
-        # outfile = open(output,'wb')
-        # outfile.write('"Inode","Full Path","Creation Time","Modified Time","Accessed Time","Size","MD5 Hash","SHA1 Hash"\n')
-        # global wr
-        # wr = csv.writer(outfile, quoting=csv.QUOTE_ALL)
-
-        # for partition in iPartitions:
-        #     filesystemObject = pytsk3.FS_Info(imagehandle, offset=(partition.start*512))
-        #     directoryObject = filesystemObject.open_dir(path=dirPath)
-        #     print "Directory:",dirPath
-        #     directoryRecurse(directoryObject,[])
+    
 
 
 if __name__ == "__main__":
 
     disk1 = investigation()
-    disk1.analysis()
+    disk1.analysis("/")
     # timeline(mount(args.imagefile,"/"),output(),)
     
