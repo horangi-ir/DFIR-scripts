@@ -42,6 +42,17 @@ argparser.add_argument(
         required=True,
         help='File to write the hashes to')
 
+argparser.add_argument('--extract', dest='extractFromDisk', action='store_true', help='File extract on')
+argparser.add_argument('--no-extract', dest='extractFromDisk', action='store_false', help='File extract off')
+
+argparser.add_argument('--hashlist', dest='getHashList', action='store_true', help='Get hashes')
+argparser.add_argument('--no-hashlist', dest='getHashList', action='store_false', help='Do not get hashes')
+
+argparser.add_argument('--antivirus', dest='antivirus', action='store_true', help='Run antivirus scan')
+argparser.add_argument('--no-antivirus', dest='antivirus', action='store_false', help='Do not run antivirus scan')
+
+argparser.set_defaults(extractFromDisk=False, getHashList=True, antivirus=True)
+
 args = argparser.parse_args()
 
 
@@ -67,9 +78,9 @@ class investigation():
 
         self.evidenceDir = args.imagefile
         self.outpath = args.output
-        self.extractFromDisk = False
-        self.getHashList = False
-        self.antivirus = True
+        self.extractFromDisk = args.extractFromDisk
+        self.getHashList = args.getHashList
+        self.antivirus = args.antivirus
 
     def output(self,imagefile):
         if imagefile != None:
@@ -209,7 +220,7 @@ def findDisks():
     for root, dirs, files in os.walk(args.imagefile):
 	#get all .EXX files instead of just .E01
         for name in files:
-            if re.search(r'\.\E[0-9]{2}', name):
+            if name.endswith(".E01"):
                 if os.path.isfile(os.path.join(root,name)):
                     if "RECYCLE" not in os.path.join(root,name):
                         disks.append(os.path.join(root,name))
@@ -217,8 +228,6 @@ def findDisks():
 
 if __name__ == "__main__":
 
-    #disk1 = investigation()
-    #disk1.findDisks()
     for index,item in enumerate(findDisks()):
         index = investigation()
         index.analysis("/", item)
