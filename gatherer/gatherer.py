@@ -18,6 +18,7 @@ from os.path import basename
 import subprocess
 from collectors import *
 import signal
+import re
 
 
 
@@ -206,8 +207,9 @@ class investigation():
 def findDisks():
     disks = []
     for root, dirs, files in os.walk(args.imagefile):
+	#get all .EXX files instead of just .E01
         for name in files:
-            if name.endswith((".E01")):
+            if re.search(r'\.\E[0-9]{2}', name):
                 if os.path.isfile(os.path.join(root,name)):
                     if "RECYCLE" not in os.path.join(root,name):
                         disks.append(os.path.join(root,name))
@@ -215,11 +217,11 @@ def findDisks():
 
 if __name__ == "__main__":
 
-    # disk1 = investigation()
-    # disk1.findDisks()
+    #disk1 = investigation()
+    #disk1.findDisks()
     for index,item in enumerate(findDisks()):
         index = investigation()
         index.analysis("/", item)
 
-    # disk1.analysis("/")
+    #disk1.analysis("/")
     
