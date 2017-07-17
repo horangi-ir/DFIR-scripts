@@ -21,59 +21,24 @@ import signal
 import re
 
 
-
-argparser = argparse.ArgumentParser(description='Hash files recursively from all NTFS parititions in a live system and optionally extract them')
-
-argparser.add_argument(
-        '-i', '--image',
-        dest='imagefile',
-        action="store",
-        type=str,
-        default=None,
-        required=False,
-        help='E01 to extract from')
-
-argparser.add_argument(
-        '-o', '--output',
-        dest='output',
-        action="store",
-        type=str,
-        default='inventory.csv',
-        required=True,
-        help='File to write the hashes to')
-
-argparser.add_argument('--extract', dest='extractFromDisk', action='store_true', help='File extract on')
-argparser.add_argument('--no-extract', dest='extractFromDisk', action='store_false', help='File extract off')
-
-argparser.add_argument('--hashlist', dest='getHashList', action='store_true', help='Get hashes')
-argparser.add_argument('--no-hashlist', dest='getHashList', action='store_false', help='Do not get hashes')
-
-argparser.add_argument('--antivirus', dest='antivirus', action='store_true', help='Run antivirus scan')
-argparser.add_argument('--no-antivirus', dest='antivirus', action='store_false', help='Do not run antivirus scan')
-
-argparser.set_defaults(extractFromDisk=False, getHashList=True, antivirus=True)
-
-args = argparser.parse_args()
-
-
 class ewf_Img_Info(pytsk3.Img_Info):
-  def __init__(self, ewf_handle):
-    self._ewf_handle = ewf_handle
-    super(ewf_Img_Info, self).__init__(
-        url="", type=pytsk3.TSK_IMG_TYPE_EXTERNAL)
 
-  def close(self):
-    self._ewf_handle.close()
+    def __init__(self, ewf_handle):
+        self._ewf_handle = ewf_handle
+        super(ewf_Img_Info, self).__init__(url="", type=pytsk3.TSK_IMG_TYPE_EXTERNAL)
 
-  def read(self, offset, size):
+    def close(self):
+        self._ewf_handle.close()
 
-    self._ewf_handle.seek(offset)
-    return self._ewf_handle.read(size)
+    def read(self, offset, size):
+        self._ewf_handle.seek(offset)
+        return self._ewf_handle.read(size)
 
-  def get_size(self):
-    return self._ewf_handle.get_media_size()
+    def get_size(self):
+        return self._ewf_handle.get_media_size()
 
 class investigation():
+
     def __init__(self):
 
         self.evidenceDir = args.imagefile
@@ -82,24 +47,26 @@ class investigation():
         self.getHashList = args.getHashList
         self.antivirus = args.antivirus
 
-    def output(self,imagefile):
+    def output(self, imagefile):
+
         if imagefile != None:
             output = self.outpath +"/"+ os.path.basename(imagefile)
             hashOutput = self.outpath +"/" +os.path.basename(imagefile) +"/"+ os.path.basename(output) +"_Hash_List" +".csv"
             clamlog = self.outpath +"/" +os.path.basename(imagefile) +"/"+ os.path.basename(output) +"_clamscan_log" +".txt"
             malwareDir = self.outpath +"/" +os.path.basename(imagefile)  +"/malware"
-
         else:
             output = self.outpath
 
         return output, hashOutput, clamlog, malwareDir
 
     def readImageFile(self,imagefile):
+
         filenames = pyewf.glob(imagefile)
+
         ewf_handle = pyewf.handle()
         ewf_handle.open(filenames)
+        
         imagehandle = ewf_Img_Info(ewf_handle)
-
         partitionTable = pytsk3.Volume_Info(imagehandle)
 
         return partitionTable, imagehandle
@@ -107,81 +74,78 @@ class investigation():
     def analysis(self, dirPath, imagefile):
 
         partitionTable, imagehandle = self.readImageFile(imagefile)
-
         for partition in partitionTable:
+
             print partition.desc
+           
             if 'NTFS' in partition.desc or 'Basic data partition' in partition.desc or 'Win95 FAT32' in partition.desc:
 
-                if self.extractFromDisk == True:
-                    extractFromDisk(imagehandle,partition,self.output(imagefile)[0])
+                if self.extractFromDisk is True:
+                    extractFromDisk(imagehandle, partition, self.output(imagefile)[0])
 
-                if self.getHashList == True:
+                if self.getHashList is True:
                     filesystemObject = pytsk3.FS_Info(imagehandle, offset=(partition.start*512))
                     directoryObject = filesystemObject.open_dir(path=dirPath)
-                    print "Directory:",dirPath
-                    if not os.path.exists(self.output(imagefile)[0]): os.makedirs(self.output(imagefile)[0])
-                    outfile = open(self.output(imagefile)[1],'wb')
-                    outfile.write('"Inode","Full Path","Creation Time","Modified Time","Accessed Time","Size","MD5 Hash","SHA1 Hash","SHA256 HASH"\n')
-                    hashOutput = csv.writer(outfile, quoting=csv.QUOTE_ALL)
-                    self.directoryRecurse(directoryObject,[],hashOutput,imagefile)
+                    print "Directory:", dirPath
 
-                if self.antivirus == True:
-                    if not os.path.exists(self.output(imagefile)[3]): os.makedirs(self.output(imagefile)[3])
+                    if not os.path.exists(self.output(imagefile)[0]):
+                        os.makedirs(self.output(imagefile)[0])
+
+                    outfile = open(self.output(imagefile)[1], 'wb')
+                    outfile.write('"Inode","Full Path","Creation Time","Modified Time","Accessed Time","Size","MD5 Hash","SHA1 Hash","SHA256 HASH"\n')
+
+                    hashOutput = csv.writer(outfile, quoting=csv.QUOTE_ALL)
+                    self.directoryRecurse(directoryObject, [],hashOutput, imagefile)
+
+                if self.antivirus is True:
+                    if not os.path.exists(self.output(imagefile)[3]):
+                        os.makedirs(self.output(imagefile)[3])
+
                     clamCommand = str("clamscan -r --log="+ self.output(imagefile)[2] +" --copy="+ self.output(imagefile)[3] +" --verbose /mnt/windows")
                     print clamCommand
-                    # self.mount(imagefile,partition)
-                    # subprocess.call(clamCommand,shell=True)
-                    # time.sleep(15)
-                    # self.umount()
 
     def directoryRecurse(self,directoryObject, parentPath, hashOutput,imagefile):
 
-            search = ".*"
+        search = ".*"
+        for entryObject in directoryObject:
+               
+            if entryObject.info.name.name in [".", ".."]:
+                continue
+                # print entryObject.info.name.name
+            try:
+                f_type = entryObject.info.name.type
+                size = entryObject.info.meta.size
+            except Exception as error:
+                # print "Cannot retrieve type or size of",entryObject.info.name.name
+                # print error.message
+                continue
 
-            for entryObject in directoryObject:
-                if entryObject.info.name.name in [".", ".."]:
-                    continue
-                  #print entryObject.info.name.name
-                try:
-                    f_type = entryObject.info.name.type
-                    size = entryObject.info.meta.size
-                except Exception as error:
-                      #print "Cannot retrieve type or size of",entryObject.info.name.name
-                      #print error.message
-                      continue
+            try:
 
-                try:
+                filepath = '/%s/%s' % ('/'.join(parentPath), entryObject.info.name.name)
+                outputPath = './%s/' % ('/'.join(parentPath))
 
-                    filepath = '/%s/%s' % ('/'.join(parentPath),entryObject.info.name.name)
-                    outputPath ='./%s/' % ('/'.join(parentPath))
-
-                    if f_type == pytsk3.TSK_FS_NAME_TYPE_DIR:
-                        sub_directory = entryObject.as_directory()
-                        # print "Entering Directory: %s" % filepath
-                        parentPath.append(entryObject.info.name.name)
-                        self.directoryRecurse(sub_directory,parentPath,hashOutput,imagefile)
-                        parentPath.pop(-1)
+                if f_type == pytsk3.TSK_FS_NAME_TYPE_DIR:
+                    sub_directory = entryObject.as_directory()
+                    # print "Entering Directory: %s" % filepath
+                    parentPath.append(entryObject.info.name.name)
+                    self.directoryRecurse(sub_directory, parentPath, hashOutput, imagefile)
+                    parentPath.pop(-1)
                         # print "Leaving Directory: %s" % filepath
 
+                elif f_type == pytsk3.TSK_FS_NAME_TYPE_REG and entryObject.info.name.name.lower().endswith((".exe", ".dll")):
+                    # print entryObject.info.name.name
+                    try:
+                        print "Hashing: ", filepath
+                        hashList(self.output(imagefile), entryObject, parentPath, hashOutput)       
+                    except:
+                        continue
 
-                    elif f_type == pytsk3.TSK_FS_NAME_TYPE_REG and entryObject.info.name.name.lower().endswith((".exe",".dll")):
-                        
-                        # print entryObject.info.name.name
-                        try: 
-                                
-                                print "Hashing: ", filepath
-                                hashList(self.output(imagefile), entryObject, parentPath,hashOutput)
-                        
-                        except:
-                            continue
- 
+            except IOError as e:
+                #print e
+                continue
 
-                except IOError as e:
-                    #print e
-                    continue
-
-    def mount(self,imagefile,partition):
-        
+    def mount(self, imagefile, partition):
 
         mountCommand = "mount -o loop,ro,no_exec,show_sys_files,offset=32256"
 
@@ -192,33 +156,35 @@ class investigation():
         ewfFile = "/mnt/ewf/ewf1"
         mountDir = "/mnt/windows"
         mountCommand += " " + ewfFile + " " + mountDir
-        ewfMount = "ewfmount " +imagefile + " " + ewfDir
+        ewfMount = "ewfmount " + imagefile + " " + ewfDir
 
         print "print executing ewfmount"
         print ewfMount + "\n"
         subprocess.call(ewfMount, shell=True)
-    
+
         # time.sleep(5)
         print "print executing mount"
         print mountCommand + "\n"
         subprocess.call(mountCommand, shell=True)
-    
+
     def umount(self):
-        
+
         ewfDir = "umount /mnt/ewf"
         mountDir = "umount /mnt/windows"
-
 
         print "executing umount on /mnt/windows"
         subprocess.call(mountDir, shell=True)
         time.sleep(3)
+
         print "executing umount on /mnt/ewf"
         subprocess.call(ewfDir, shell=True)
 
+
 def findDisks():
+
     disks = []
     for root, dirs, files in os.walk(args.imagefile):
-	#get all .EXX files instead of just .E01
+        # get all .EXX files instead of just .E01
         for name in files:
             if name.endswith(".E01"):
                 if os.path.isfile(os.path.join(root,name)):
@@ -226,11 +192,32 @@ def findDisks():
                         disks.append(os.path.join(root,name))
     return disks
 
-if __name__ == "__main__":
 
-    for index,item in enumerate(findDisks()):
+def setOptions():
+
+    argparser = argparse.ArgumentParser(description='Hash files recursively from all NTFS parititions in a live system and optionally extract them')
+
+    argparser.add_argument('-i', '--image', dest='imagefile', action="store", type=str, default=None, required=False, help='E01 to extract from')
+    argparser.add_argument('-o', '--output', dest='output', action="store", type=str, default='inventory.csv', required=True, help='File to write the hashes to')
+
+    argparser.add_argument('--extract', dest='extractFromDisk', action='store_true', help='File extract on')
+    argparser.add_argument('--no-extract', dest='extractFromDisk', action='store_false', help='File extract off')
+
+    argparser.add_argument('--hashlist', dest='getHashList', action='store_true', help='Get hashes')
+    argparser.add_argument('--no-hashlist', dest='getHashList', action='store_false', help='Do not get hashes')
+
+    argparser.add_argument('--antivirus', dest='antivirus', action='store_true', help='Run antivirus scan')
+    argparser.add_argument('--no-antivirus', dest='antivirus', action='store_false', help='Do not run antivirus scan')
+
+    argparser.set_defaults(extractFromDisk=False, getHashList=True, antivirus=False)
+
+    args = argparser.parse_args()
+
+    for index, item in enumerate(findDisks()):
         index = investigation()
         index.analysis("/", item)
 
-    #disk1.analysis("/")
-    
+    # disk1.analysis("/")
+
+if __name__ == "__main__":
+    setOptions()
